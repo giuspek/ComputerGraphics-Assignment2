@@ -193,12 +193,19 @@ void MeshWithConnectivity::LoopSubdivision() {
 					int v2 = indices[i][(j + 2) % 3];
 					int tria = neighborTris[i][j];
 					int tria_Edge = neighborEdges[i][j];
-					int v3 = indices[tria][(tria_Edge + 2) % 3];
 					Vec3f pos, col, norm;
+					if (tria == -1 || tria_Edge == -1) {
+						pos = 0.5f * (positions[v0] + positions[v1]);
+						col = 0.5f * (colors[v0] + colors[v1]);
+						norm = 0.5f * (normals[v0] + normals[v1]);
+					}
+					else{
+						int v3 = indices[tria][(tria_Edge + 2) % 3];
+						pos = 0.375f * positions[v0] + 0.375f * positions[v1] + 0.125f * positions[v2] + 0.125f * positions[v3];
+						col = 0.375f * colors[v0] + 0.375f * colors[v1] + 0.125f * colors[v2] + 0.125f * colors[v3];
+						norm = 0.375f * normals[v0] + 0.375f * normals[v1] + 0.125f * normals[v2] + 0.125f * normals[v3];
+					}
 					// This default implementation just puts the new vertex at the edge midpoint.
-					pos = 0.375f * positions[v0] + 0.375f * positions[v1] + 0.125f * positions[v2] + 0.125f * positions[v3];
-					col = 0.5f * (colors[v0] + colors[v1]);
-					norm = 0.5f * (normals[v0] + normals[v1]);
 
 					new_positions.push_back(pos);
 					new_colors.push_back(col);
