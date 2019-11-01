@@ -28,7 +28,38 @@ namespace
     static vector< FW::Vec3i > triSweep( unsigned dia, unsigned len, bool closed )
     {
         vector< FW::Vec3i > ret;
-
+		int k = 10;
+		for (int i = 0; i < len; i++) {
+			for (int j = 0; j < dia; j++) {
+				if (j == 0) {
+					ret.push_back(Vec3i((i*dia+j)%(dia*len), ((i+1)*dia+j) % (dia * len), (i*dia+j+1) % (dia * len)));
+					if (k > 0) {
+						std::cout << "Tri " << 10 - k << ": " << ret[ret.size() - 1][0] << " ; " << ret[ret.size() - 1][1] << " ; " << ret[ret.size() - 1][2] << " ; " << endl;
+						k--;
+					}
+				}
+				else if (j == dia - 1) {
+					ret.push_back(Vec3i((i * dia + j) % (dia * len), ((i + 1) * dia + j - 1) % (dia * len), ((i + 1)* dia + j) % (dia * len)));
+					if (k > 0) {
+						std::cout << "Tri " << 10 - k << ": " << ret[ret.size()-1][0]<< " ; " << ret[ret.size() - 1][1] << " ; " << ret[ret.size() - 1][2] << " ; " << endl;
+						k--;
+					}
+				}
+				else {
+					ret.push_back(Vec3i((i * dia + j) % (dia * len), ((i + 1) * dia + j - 1) % (dia * len), ((i + 1) * dia + j) % (dia * len)));
+					if (k > 0) {
+						std::cout << "Tri " << 10 - k << ": " << ret[ret.size() - 1][0] << " ; " << ret[ret.size() - 1][1] << " ; " << ret[ret.size() - 1][2] << " ; " << endl;
+						k--;
+					}
+					ret.push_back(Vec3i((i * dia + j) % (dia * len), ((i + 1) * dia + j) % (dia * len), (i * dia + j + 1) % (dia * len)));
+					if (k > 0) {
+						std::cout << "Tri " << 10 - k << ": " << ret[ret.size() - 1][0] << " ; " << ret[ret.size() - 1][1] << " ; " << ret[ret.size() - 1][2] << " ; " << endl;
+						k--;
+					}
+					
+				}
+			}
+		}
 		// YOUR CODE HERE: generate zigzagging triangle indices and push them to ret.
 
         return ret;
@@ -57,14 +88,35 @@ Surface makeSurfRev(const Curve &profile, unsigned steps)
         cerr << "surfRev profile curve must be flat on xy plane." << endl;
         exit(0);
     }
+	//std::cout << "Here's steps: " << steps << endl;
 
     // YOUR CODE HERE: build the surface.  See surf.h for type details.
 	// Generate the vertices and normals by looping the number of the steps and again for each 
 	// point in the profile (that's two cascaded loops), and finally get the faces with triSweep.
 	// You'll need to rotate the curve at each step, similar to the cone in assignment 0 but
 	// now you should be using a real rotation matrix.
+	//std::cout << "Profile: " << profile.size()<<endl;
 
-    cerr << "\t>>> makeSurfRev called (but not implemented).\n\t>>> Returning empty surface." << endl;
+	for (int i = 0; i < steps; i++) {
+		Mat4f M = Mat4f();
+		float angle = (2 * FW_PI * i) / steps;
+		angle *=-1;
+		M.setRow(0, Vec4f(FW::cos(angle), 0, FW::sin(angle), 0.0f));
+		M.setRow(2, Vec4f(-1 * FW::sin(angle), 0, FW::cos(angle), 0.0f));
+		Mat3f M_i = M.getXYZ();
+		M_i.transpose();
+		for (int j = 0; j < profile.size(); j++) {
+			Vec3f V_new = (M * Vec4f(profile[j].V, 0.0f)).getXYZ();
+			Vec3f N_new = (M_i * profile[j].N).normalized();
+			//std::cout << "V: " << N_new[0] << ";" << N_new[1] << ";" << N_new[2] << ";" << endl;
+			surface.VV.push_back(V_new);
+			surface.VN.push_back(N_new);
+		}
+
+	}
+	surface.VF = triSweep(profile.size(),steps,false);
+
+    cerr << "\t>>> makeSurfRev called.\n\t>>> Returning surface." << endl;
  
     return surface;
 }
@@ -82,8 +134,30 @@ Surface makeGenCyl(const Curve &profile, const Curve &sweep )
     // YOUR CODE HERE: build the surface. 
 	// This is again two cascaded loops. Build the local coordinate systems and transform
 	// the points in a very similar way to the one with makeSurfRev.
+	//std::cout << "Profile: " << profile.size() << endl;
+	//std::cout << "Sweep: " << sweep.size() << endl;
+	for (int i = sweep.size() - 1; i >= 0; i--) {
+		Mat4f M = Mat4f();
+		M.setCol(0, Vec4f(sweep[i].N, 0.0f));
+		M.setCol(1, Vec4f(sweep[i].B, 0.0f));
+		M.setCol(2, Vec4f(sweep[i].T, 0.0f));
+		M.setCol(3, Vec4f(sweep[i].V, 1.0f));
+		//M.transpose();
+		Mat3f M_i = M.getXYZ();
+		//M_i.invert();
+		M_i.transpose();
+		for (int j = 0; j < profile.size(); j++) {
+			Vec3f V_new = sweep[i].V + (M * Vec4f(profile[j].V, 0.0f)).getXYZ();
+			Vec3f N_new =  (M_i * profile[j].N).normalized();
+			//std::cout << "V: " << N_new[0] << ";" << N_new[1] << ";" << N_new[2] << ";" << endl;
+			surface.VV.push_back(V_new);
+			surface.VN.push_back(N_new);
+		}
+	}
 
-    cerr << "\t>>> makeGenCyl called (but not implemented).\n\t>>> Returning empty surface." <<endl;
+	surface.VF = triSweep(profile.size(), sweep.size(), false);
+
+    cerr << "\t>>> makeGenCyl called.\n\t>>> Returning surface." <<endl;
 
     return surface;
 }
@@ -116,8 +190,10 @@ void drawSurface(const Surface &surface, bool shaded)
     }
 
     glBegin(GL_TRIANGLES);
+	//std::cout << "Almost" << endl;
     for (unsigned i=0; i<surface.VF.size(); i++)
     {
+		//std::cout << "I: " << surface.VF[i][0] << ";" << surface.VF[i][1] << ";" << surface.VF[i][2] << ";" << endl;
         glNormal(surface.VN[surface.VF[i][0]]);
         glVertex(surface.VV[surface.VF[i][0]]);
         glNormal(surface.VN[surface.VF[i][1]]);

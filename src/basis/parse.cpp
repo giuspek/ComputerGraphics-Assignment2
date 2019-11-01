@@ -182,6 +182,16 @@ bool parseFile(istream &in,
             dims.push_back(2);
             if (named) curveIndex[objName] = dims.size()-1;
         }
+		else if (objType == "catrom2")
+		{
+			cerr << " reading catrom2 " << "[" << objName << "]" << endl;
+			in >> steps;
+			curves.push_back(evalCatmullRom2(cpsToAdd = readCps(in, 2), steps, adaptivetessellation, errorbound, minstep));
+			curveNames.push_back(objName);
+			dims.push_back(2);
+			if (named) curveIndex[objName] = dims.size() - 1;
+
+		}
         else if (objType == "bez3")
         {
             cerr << " reading bez3 " << "[" << objName << "]" << endl;
@@ -201,6 +211,15 @@ bool parseFile(istream &in,
             dims.push_back(3);
             if (named) curveIndex[objName] = dims.size()-1;
         }
+		else if (objType == "catrom3")
+		{
+			cerr << " reading catrom3 " << "[" << objName << "]" << endl;
+			in >> steps;
+			curves.push_back(evalCatmullRom2(cpsToAdd = readCps(in, 3), steps, adaptivetessellation, errorbound, minstep));
+			curveNames.push_back(objName);
+			dims.push_back(3);
+			if (named) curveIndex[objName] = dims.size() - 1;
+		}
 		else if (objType == "orientation")
 		{
 			cerr << " reading camera path orientations" << endl;

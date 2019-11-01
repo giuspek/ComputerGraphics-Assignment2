@@ -37,6 +37,9 @@ Curve evalBezier(const std::vector<FW::Vec3f>& P, unsigned steps, bool adaptive,
 // Bsplines only require that there are at least 4 control points.
 Curve evalBspline(const std::vector<FW::Vec3f>& P, unsigned steps, bool adaptive, float errorbound, float minstep);
 
+Curve evalCatmullRom(const std::vector<FW::Vec3f>& P, unsigned steps, bool adaptive, float errorbound, float minstep);
+Curve evalCatmullRom2(const std::vector<FW::Vec3f>& P, unsigned steps, bool adaptive, float errorbound, float minstep);
+
 // Create a circle on the xy-plane of radius and steps
 Curve evalCircle(float radius, unsigned steps);
 

@@ -36,19 +36,60 @@ Curve coreBezier(const Vec3f& p0,
 	// YOUR CODE HERE (R1): build the basis matrix and loop the given number of steps,
 	// computing points on the spline
 
-	Mat4f B, G;
+	Mat4f B, G, T;
 	B.setRow(0, Vec4f(1, -3, 3, -1)); G.setCol(0, Vec4f(p0, 0));
 	B.setRow(1, Vec4f(0, 3, -6, 3)); G.setCol(1, Vec4f(p1, 0));
 	B.setRow(2, Vec4f(0, 0, 3, -3)); G.setCol(2, Vec4f(p2, 0));
 	B.setRow(3, Vec4f(0,0,0,1)); G.setCol(3, Vec4f(p3, 1));
+	T.setRow(0, Vec4f(-3, 6, -3, 0));
+	T.setRow(1, Vec4f(3, -12, 9, 0));
+	T.setRow(2, Vec4f(0, 6, -9, 0));
+	T.setRow(3, Vec4f(0, 0, 3, 0));
 
 	for (unsigned i = 0; i <= steps; ++i) {
 		float t = float(i) / float(steps);
 		R[i].V = (G * B * Vec4f(1, t, t * t, t * t * t)).getXYZ();
+		Vec3f tangent = (G * T * Vec4f(1, t, t*t, t * t * t)).getXYZ();
+		R[i].T = tangent.normalized();
+		//std::cout << "Tangent: " << R[i].V[0] << ";" << R[i].V[1] << ";" << R[i].V[2] << ";" << endl;
+		if (i == 0)
+			R[i].N = (cross(Binit, R[i].T)).normalized();
+		else
+			R[i].N = (cross(R[i - 1].B, R[i].T)).normalized();
+		R[i].B = cross(R[i].T,R[i].N).normalized();
 	}
 
 	return R;
-}    
+}   
+
+Curve coreCatmull(const Vec3f& p0,
+	const Vec3f& p1,
+	const Vec3f& p2,
+	const Vec3f& p3,
+	const Vec3f& Binit,
+	unsigned steps) {
+
+	Curve R(steps + 1);
+
+	// YOUR CODE HERE (R1): build the basis matrix and loop the given number of steps,
+	// computing points on the spline
+
+	Mat4f B, G;
+	B.setRow(0, Vec4f(0, 2, 0, 0)); G.setCol(0, Vec4f(p0, 0));
+	B.setRow(1, Vec4f(-1, 0, 1, 0)); G.setCol(1, Vec4f(p1, 0));
+	B.setRow(2, Vec4f(2, -5, 4, -1)); G.setCol(2, Vec4f(p2, 0));
+	B.setRow(3, Vec4f(-1, 3, -3, 1)); G.setCol(3, Vec4f(p3, 1));
+	B = 0.5f * B;
+	B.transpose();
+
+	for (unsigned i = 0; i <= steps; ++i) {
+		float t = float(i) / float(steps);
+		R[i].V = (G * B * Vec4f(1, t, t * t, t * t * t)).getXYZ();
+		//std::cout << R[i].V[0] << " - " << R[i].V[1] << " - " << R[i].V[2] << endl;
+	}
+
+	return R;
+}
 
 } // namespace
 
@@ -84,7 +125,7 @@ Curve evalBezier(const vector<Vec3f>& P, unsigned steps, bool adaptive, float er
     // "resolution" of the discretized spline curve with it.
 	Curve CC;
 	for (int i = 0; i < (P.size() - 1); i = i + 3) {
-		Curve sol = coreBezier(P[i],P[i+1],P[i+2],P[i+3], Vec3f(), steps);
+		Curve sol = coreBezier(P[i],P[i+1],P[i+2],P[i+3], Vec3f(0,0,1), steps);
 		CC.insert(CC.end(), sol.begin(), sol.end());
 	}
 
@@ -138,10 +179,12 @@ Curve evalBspline(const vector<Vec3f>& P, unsigned steps, bool adaptive, float e
 	Bspline = (1.0f / 6.0f) * Bspline;
 	B.invert();
 	Mat4f Bres = Bspline * B;
-	vector<Vec3f> P2;
+	
+	Curve res;
 	Mat4f G2;
 	
 	for (int i = 0; i < P.size() - 3; i++) {
+		vector<Vec3f> P2;
 		G2.setCol(0,Vec4f(P[i],0.0f));
 		G2.setCol(1, Vec4f(P[i+1], 0.0f));
 		G2.setCol(2, Vec4f(P[i+2], 0.0f));
@@ -157,9 +200,9 @@ Curve evalBspline(const vector<Vec3f>& P, unsigned steps, bool adaptive, float e
 		Vec4f p4 = G1.getCol(3);
 		P2.push_back(p4.getXYZ());
 
+		Curve temp = evalBezier(P2, steps, adaptive, errorbound, minstep);
+		res.insert(res.end(), temp.begin(), temp.end());
 	}
-
-	Curve res = evalBezier(P2, steps, adaptive, errorbound, minstep);
 
     cerr << "\t>>> evalBSpline has been called with the following input:" << endl;
 
@@ -173,6 +216,94 @@ Curve evalBspline(const vector<Vec3f>& P, unsigned steps, bool adaptive, float e
 
     // Return an empty curve right now.
     return res;
+}
+
+Curve evalCatmullRom2(const vector<Vec3f>& P, unsigned steps, bool adaptive, float errorbound, float minstep) {
+	// Check
+	if (P.size() < 4) {
+		cerr << "evalCatmullRom must be called with 3n+1 control points." << endl;
+		_CrtDbgBreak();
+		exit(0);
+	}
+
+	Curve CC;
+	for (int i = 0; i < (P.size() - 3); i = i + 1) {
+		Curve sol = coreCatmull(P[i], P[i + 1], P[i + 2], P[i + 3], Vec3f(), steps);
+		CC.insert(CC.end(), sol.begin(), sol.end());
+	}
+
+	cerr << "\t>>> evalCatmullRom has been called with the following input:" << endl;
+
+	// to append to a std::vector, use std::insert.
+	// for example, to add 'b' to the end of 'a', we'd call 'a.insert(a.end(), b.begin(), b.end());'
+
+	cerr << "\t>>> Control points (type vector<Vec3f>): " << endl;
+	for (unsigned i = 0; i < P.size(); ++i) {
+		cerr << "\t>>> "; printTranspose(P[i]); cerr << endl;
+	}
+
+	cerr << "\t>>> Steps (type steps): " << steps << endl;
+	cerr << "\t>>> Returning empty curve." << endl;
+
+	// Right now this will just return this empty curve.
+	return CC;
+}
+
+Curve evalCatmullRom(const vector<Vec3f>& P, unsigned steps, bool adaptive, float errorbound, float minstep) {
+	// Check
+	if (P.size() < 4) {
+		cerr << "evalCatmull must be called with 4 or more control points." << endl;
+		exit(0);
+	}
+
+	Mat4f B, BCatmullRom;
+	B.setRow(0, Vec4f(1, -3, 3, -1));
+	B.setRow(1, Vec4f(0, 3, -6, 3));
+	B.setRow(2, Vec4f(0, 0, 3, -3));
+	B.setRow(3, Vec4f(0, 0, 0, 1));
+	BCatmullRom.setRow(3, Vec4f(-1, 3, -3, 1));
+	BCatmullRom.setRow(2, Vec4f(2, -5, 4, -1));
+	BCatmullRom.setRow(1, Vec4f(-1, 0, 1, 0));
+	BCatmullRom.setRow(0, Vec4f(0, 2, 0, 0));
+	BCatmullRom = (1.0f / 2.0f) * BCatmullRom;
+	B.transpose();
+	B.invert();
+	Mat4f Bres = BCatmullRom * B;
+	vector<Vec3f> P2;
+	Mat4f G2;
+
+	for (int i = 0; i < P.size() - 3; i++) {
+		G2.setCol(0, Vec4f(P[i], 0.0f));
+		G2.setCol(1, Vec4f(P[i + 1], 0.0f));
+		G2.setCol(2, Vec4f(P[i + 2], 0.0f));
+		G2.setCol(3, Vec4f(P[i + 3], 0.0f));
+		Mat4f G1 = G2 * Bres;
+
+		Vec4f p1 = G1.getCol(0);
+		P2.push_back(p1.getXYZ());
+		Vec4f p2 = G1.getCol(1);
+		P2.push_back(p2.getXYZ());
+		Vec4f p3 = G1.getCol(2);
+		P2.push_back(p3.getXYZ());
+		Vec4f p4 = G1.getCol(3);
+		P2.push_back(p4.getXYZ());
+
+	}
+
+	Curve res = evalBezier(P2, steps, adaptive, errorbound, minstep);
+
+	cerr << "\t>>> evalBSpline has been called with the following input:" << endl;
+
+	cerr << "\t>>> Control points (type vector< Vec3f >): " << endl;
+	for (unsigned i = 0; i < P.size(); ++i) {
+		cerr << "\t>>> "; printTranspose(P[i]); cerr << endl;
+	}
+
+	cerr << "\t>>> Steps (type steps): " << steps << endl;
+	cerr << "\t>>> Returning empty curve." << endl;
+
+	// Return an empty curve right now.
+	return res;
 }
 
 Curve evalCircle(float radius, unsigned steps) {

@@ -226,7 +226,6 @@ void MeshWithConnectivity::LoopSubdivision() {
 			int v0 = indices[i][j];
 			int v1 = indices[i][(j+1)%3];
 			std::vector<int> near_vertex;
-			near_vertex.push_back(v1);
 
 			// If we're doing the debug pass, set vertex index to the one under mouse position
 			if (debugPass)
@@ -273,11 +272,52 @@ void MeshWithConnectivity::LoopSubdivision() {
 				actual_triangle = near_tri;
 				actual_edge = (near_edge + 1) % 3;
 			} while (actual_triangle != i);
-
+			//std::cout << "Prova " << "\n";
 			if (boundary) {
-				pos = positions[v0];
-				col = colors[v0];
-				norm = normals[v0];
+				//std::cout << "Prova2 " << "\n";
+				//std::cout << "Nearj " << neighborEdges[i][j] <<"\n";
+				//std::cout << "Nearj " << neighborEdges[i][(j - 1) % 3] << "\n";
+				if (neighborEdges[i][j] == -1 && neighborEdges[i][(j + 2) % 3] == -1) {
+					//std::cout << "angolo di angolo\n";
+					int v2 = indices[i][(j + 2) % 3];
+					pos = 0.75f * positions[v0] + 0.125f * positions[v1] + 0.125f * positions[v2];
+					norm = 0.75f * normals[v0] + 0.125f * normals[v1] + 0.125f * normals[v2];
+					col = 0.75f * colors[v0] + 0.125f * colors[v1] + 0.125f * colors[v2];
+				}
+				else if (neighborEdges[i][(j + 2) % 3] == -1) {
+					//std::cout << "Move on the right\n";
+					int v2 = indices[i][(j + 2) % 3];
+					int actual_triangle = i;
+					int actual_edge = j;
+					//std::cout << "Actual edge: " << j << "\n";
+					while (neighborEdges[actual_triangle][actual_edge] != -1) {
+						int near_tri = neighborTris[actual_triangle][actual_edge];
+						int near_edge = neighborEdges[actual_triangle][actual_edge];
+						actual_triangle = near_tri;
+						actual_edge = (near_edge + 1) % 3;
+					}
+					int v3 = indices[actual_triangle][(actual_edge + 1) % 3];
+					pos = 0.75f * positions[v0] + 0.125f * positions[v2] + 0.125f * positions[v3];
+					norm = 0.75f * normals[v0] + 0.125f *normals[v2] + 0.125f * normals[v3];
+					col = 0.75f * colors[v0] + 0.125f * colors[v2] + 0.125f * colors[v3];
+				}
+				else {
+					//std::cout << "Move on the right\n";
+					int v2 = indices[i][j];
+					int actual_triangle = i;
+					int actual_edge = (j+2)%3;
+					//std::cout << "Actual edge: " << j << "\n";
+					while (neighborEdges[actual_triangle][actual_edge] != -1) {
+						int near_tri = neighborTris[actual_triangle][actual_edge];
+						int near_edge = neighborEdges[actual_triangle][actual_edge];
+						actual_triangle = near_tri;
+						actual_edge = (near_edge + 2) % 3;
+					}
+					int v3 = indices[actual_triangle][(actual_edge)];
+					pos = 0.75f * positions[v0] + 0.125f * positions[v2] + 0.125f * positions[v3];
+					norm = 0.75f * normals[v0] + 0.125f * normals[v2] + 0.125f * normals[v3];
+					col = 0.75f * colors[v0] + 0.125f * colors[v2] + 0.125f * colors[v3];
+				}
 			}else{
 				float B;
 				if (near_vertex.size() == 3)
@@ -293,9 +333,7 @@ void MeshWithConnectivity::LoopSubdivision() {
 					norm += B * normals[near_vertex[k]];
 				}
 			}
-			
-
-
+		
 			// Stop here if we're doing the debug pass since we don't actually need to modify the mesh
 			if (debugPass)
 				return;
